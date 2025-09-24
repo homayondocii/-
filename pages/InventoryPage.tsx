@@ -29,7 +29,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ products, updatePr
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('inventoryTitle')}</h2>
                 <input
                     type="text"
-                    placeholder="جستجو بر اساس نام یا بارکد..."
+                    placeholder={t('searchInventoryPlaceholder')}
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     className="p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600"
@@ -55,8 +55,8 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ products, updatePr
                                 <td className="px-6 py-4">{product.stock}</td>
                                 <td className="px-6 py-4">{formatCurrency(product.price)}</td>
                                 <td className="px-6 py-4 text-center">
-                                    <button onClick={() => updateProductStock(product.id, 1)} className="font-medium text-green-600 dark:text-green-500 hover:underline mx-1">ورود</button>
-                                    <button onClick={() => updateProductStock(product.id, -1)} className="font-medium text-red-600 dark:text-red-500 hover:underline mx-1">خروج</button>
+                                    <button onClick={() => updateProductStock(product.id, 1)} className="font-medium text-green-600 dark:text-green-500 hover:underline mx-1">{t('stockIn')}</button>
+                                    <button onClick={() => updateProductStock(product.id, -1)} className="font-medium text-red-600 dark:text-red-500 hover:underline mx-1">{t('stockOut')}</button>
                                 </td>
                             </tr>
                         ))}

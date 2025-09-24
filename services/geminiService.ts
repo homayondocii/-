@@ -1,38 +1,47 @@
-
 import { GoogleGenAI } from "@google/genai";
 
-// A mock to simulate process.env.API_KEY, as it's not available in this environment.
-// In a real application, this would be set in your environment variables.
-const API_KEY = undefined; 
+let ai: GoogleGenAI | null = null;
+let configured = false;
 
-const FAKE_API_RESPONSE = "متاسفانه کلید API برای اتصال به دستیار هوشمند تنظیم نشده است. این یک پاسخ نمونه است. برای فعال کردن این ویژگی، لطفاً کلید Gemini API خود را در متغیرهای محیطی برنامه قرار دهید. \n\n در حالت فعال، من می‌توانم به شما در تحلیل داده‌های مالی کمک کنم. برای مثال، می‌توانید بپرسید 'بیشترین هزینه من در ماه گذشته چه بوده است؟' یا 'مجموع درآمدهای من چقدر است؟'";
+// FIX: API key must be obtained exclusively from the environment variable `process.env.API_KEY`.
+// The API key is no longer managed through localStorage or the settings UI.
+if (process.env.API_KEY) {
+    ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    configured = true;
+} else {
+    console.warn("Gemini API key not found in environment variables (process.env.API_KEY). Financial assistant will be disabled.");
+}
 
-export const askFinancialAssistant = async (prompt: string, contextData: string): Promise<string> => {
-    if (!API_KEY) {
-        console.warn("API_KEY is not set. Returning a mock response.");
-        return new Promise(resolve => setTimeout(() => resolve(FAKE_API_RESPONSE), 1000));
+export const isGeminiConfigured = () => configured;
+
+export const getFinancialAdvice = async (contextData: string, question: string): Promise<string> => {
+    if (!ai) {
+        return "Gemini API client is not initialized. Please ensure the API_KEY environment variable is set.";
     }
 
     try {
-        const ai = new GoogleGenAI({ apiKey: API_KEY });
-        
-        const fullPrompt = `You are a professional financial assistant for a personal accounting app. Your responses must be in Persian. Analyze the following data and answer the user's question.
-        
-        Data:
-        ${contextData}
-        
-        User's Question:
-        ${prompt}
-        `;
+        // FIX: Using systemInstruction for better prompt structure.
+        const systemInstruction = `You are a professional financial advisor. Based on the following JSON data, answer the user's question. Provide a concise and helpful analysis.`;
+        const prompt = `Data:
+${contextData}
+
+User's Question:
+${question}`;
 
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: fullPrompt,
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                systemInstruction: systemInstruction,
+            },
         });
-
+        
         return response.text;
     } catch (error) {
         console.error("Error calling Gemini API:", error);
-        return "خطایی در ارتباط با دستیار هوشمند رخ داد. لطفاً دوباره تلاش کنید.";
+        if (error instanceof Error) {
+            return `An error occurred while fetching financial advice: ${error.message}`;
+        }
+        return "An unknown error occurred while fetching financial advice.";
     }
 };

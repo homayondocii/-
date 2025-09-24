@@ -1,15 +1,12 @@
-
-export enum Language {
-    FA = 'fa',
-    EN = 'en',
-}
+export type Language = 'en' | 'fa';
 
 export enum Page {
     DASHBOARD = 'dashboard',
     TRANSACTIONS = 'transactions',
     CHECKS = 'checks',
     INVENTORY = 'inventory',
-    INVOICES = 'invoices',
+    INVOICE = 'invoice',
+    SETTINGS = 'settings',
 }
 
 export enum TransactionType {
@@ -23,7 +20,8 @@ export interface Transaction {
     category: string;
     description: string;
     amount: number;
-    date: string; // ISO format
+    date: string; // ISO string format
+    user_id?: string;
 }
 
 export enum CheckType {
@@ -42,9 +40,10 @@ export interface Check {
     type: CheckType;
     payee: string;
     amount: number;
-    dueDate: string; // ISO format
+    dueDate: string; // ISO string format
     status: CheckStatus;
     description: string;
+    user_id?: string;
 }
 
 export interface Product {
@@ -53,4 +52,5 @@ export interface Product {
     barcode: string;
     stock: number;
     price: number;
+    user_id?: string;
 }

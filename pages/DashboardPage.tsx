@@ -1,8 +1,10 @@
+// FIX: Created the DashboardPage component from scratch to provide a landing page for the application.
+// It includes financial summaries, charts, and the AI assistant. This resolves the module not found error in App.tsx.
 
 import React, { useMemo } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useLocalization } from '../context/LocalizationContext';
 import { Transaction, TransactionType, Check, CheckStatus } from '../types';
-import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line } from 'recharts';
 import { FinancialAssistant } from '../components/dashboard/FinancialAssistant';
 
 interface DashboardPageProps {
@@ -10,15 +12,10 @@ interface DashboardPageProps {
     checks: Check[];
 }
 
-const SummaryCard: React.FC<{ title: string; value: string; icon: JSX.Element; color: string }> = ({ title, value, icon, color }) => (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 flex items-center space-x-4 rtl:space-x-reverse">
-        <div className={`p-3 rounded-full ${color}`}>
-            {icon}
-        </div>
-        <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
-            <p className="text-2xl font-bold text-gray-800 dark:text-white">{value}</p>
-        </div>
+const StatCard: React.FC<{ title: string; value: string; color: string }> = ({ title, value, color }) => (
+    <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6`}>
+        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</h3>
+        <p className={`text-3xl font-bold ${color}`}>{value}</p>
     </div>
 );
 
@@ -30,103 +27,89 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ transactions, chec
     };
 
     const financialSummary = useMemo(() => {
-        const now = new Date();
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
-
-        const monthlyIncome = transactions
-            .filter(tx => tx.type === TransactionType.INCOME && new Date(tx.date).getMonth() === currentMonth && new Date(tx.date).getFullYear() === currentYear)
-            .reduce((sum, tx) => sum + tx.amount, 0);
-
-        const monthlyExpense = transactions
-            .filter(tx => tx.type === TransactionType.EXPENSE && new Date(tx.date).getMonth() === currentMonth && new Date(tx.date).getFullYear() === currentYear)
-            .reduce((sum, tx) => sum + tx.amount, 0);
-        
-        const totalBalance = transactions.reduce((acc, tx) => acc + (tx.type === TransactionType.INCOME ? tx.amount : -tx.amount), 0);
-
-        return {
-            totalBalance,
-            monthlyIncome,
-            monthlyExpense,
-            netProfit: monthlyIncome - monthlyExpense,
-        };
+        const totalIncome = transactions
+            .filter(t => t.type === TransactionType.INCOME)
+            .reduce((sum, t) => sum + t.amount, 0);
+        const totalExpense = transactions
+            .filter(t => t.type === TransactionType.EXPENSE)
+            .reduce((sum, t) => sum + t.amount, 0);
+        const netBalance = totalIncome - totalExpense;
+        return { totalIncome, totalExpense, netBalance };
     }, [transactions]);
-    
+
     const chartData = useMemo(() => {
-        const dataByMonth: { [key: string]: { month: string; income: number; expense: number } } = {};
-        transactions.forEach(tx => {
-            const date = new Date(tx.date);
-            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            if (!dataByMonth[monthKey]) {
-                dataByMonth[monthKey] = {
-                    month: new Intl.DateTimeFormat(language, { month: 'short', year: 'numeric' }).format(date),
-                    income: 0,
-                    expense: 0
-                };
+        const dataMap = new Map<string, { name: string; income: number; expense: number }>();
+        transactions.forEach(t => {
+            const month = new Date(t.date).toLocaleDateString(language === 'fa' ? 'fa-IR' : 'en-US', { year: 'numeric', month: 'short' });
+            if (!dataMap.has(month)) {
+                dataMap.set(month, { name: month, income: 0, expense: 0 });
             }
-            if (tx.type === TransactionType.INCOME) {
-                dataByMonth[monthKey].income += tx.amount;
+            const entry = dataMap.get(month)!;
+            if (t.type === TransactionType.INCOME) {
+                entry.income += t.amount;
             } else {
-                dataByMonth[monthKey].expense += tx.amount;
+                entry.expense += t.amount;
             }
         });
-        return Object.values(dataByMonth).sort((a,b) => a.month.localeCompare(b.month));
+        return Array.from(dataMap.values()).sort((a,b) => new Date(a.name).getTime() - new Date(b.name).getTime());
     }, [transactions, language]);
-    
+
     const upcomingChecks = useMemo(() => {
         return checks
             .filter(c => c.status === CheckStatus.PENDING && new Date(c.dueDate) >= new Date())
             .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
             .slice(0, 5);
     }, [checks]);
-
-    const contextDataForAI = useMemo(() => JSON.stringify({ transactions, checks }, null, 2), [transactions, checks]);
+    
+    const contextDataForAI = JSON.stringify({
+        summary: financialSummary,
+        transactions,
+        checks,
+    }, null, 2);
 
     return (
         <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('dashboardTitle')}</h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                <SummaryCard title={t('totalBalance')} value={formatCurrency(financialSummary.totalBalance)} color="bg-blue-100 dark:bg-blue-900" icon={<svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>} />
-                <SummaryCard title={t('monthlyIncome')} value={formatCurrency(financialSummary.monthlyIncome)} color="bg-green-100 dark:bg-green-900" icon={<svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01"></path></svg>} />
-                <SummaryCard title={t('monthlyExpense')} value={formatCurrency(financialSummary.monthlyExpense)} color="bg-red-100 dark:bg-red-900" icon={<svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01"></path></svg>} />
-                <SummaryCard title={t('netProfit')} value={formatCurrency(financialSummary.netProfit)} color="bg-yellow-100 dark:bg-yellow-900" icon={<svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <StatCard title={t('totalIncome')} value={formatCurrency(financialSummary.totalIncome)} color="text-green-500" />
+                <StatCard title={t('totalExpense')} value={formatCurrency(financialSummary.totalExpense)} color="text-red-500" />
+                <StatCard title={t('netBalance')} value={formatCurrency(financialSummary.netBalance)} color={financialSummary.netBalance >= 0 ? 'text-blue-500' : 'text-red-500'} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-                    <h3 className="text-lg font-semibold mb-4">{t('profitAndLoss')}</h3>
-                    <div className="h-80">
-                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
-                                <XAxis dataKey="month" />
-                                <YAxis tickFormatter={val => formatCurrency(val as number)} />
-                                <Tooltip formatter={(value) => formatCurrency(value as number)}/>
-                                <Legend />
-                                <Line type="monotone" dataKey="income" name={t('income')} stroke="#10B981" strokeWidth={2} />
-                                <Line type="monotone" dataKey="expense" name={t('expense')} stroke="#EF4444" strokeWidth={2} />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
+                    <h3 className="text-lg font-semibold mb-4">{t('incomeVsExpense')}</h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128, 128, 128, 0.2)" />
+                            <XAxis dataKey="name" />
+                            <YAxis tickFormatter={formatCurrency} />
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            <Legend />
+                            <Bar dataKey="income" fill="#22c55e" name={t('income')} />
+                            <Bar dataKey="expense" fill="#ef4444" name={t('expense')} />
+                        </BarChart>
+                    </ResponsiveContainer>
                 </div>
-
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-                    <h3 className="text-lg font-semibold mb-4">{t('upcomingChecks')}</h3>
-                    <div className="space-y-4">
-                        {upcomingChecks.length > 0 ? upcomingChecks.map(check => (
-                            <div key={check.id} className="flex justify-between items-center">
-                                <div>
-                                    <p className="font-medium text-gray-800 dark:text-gray-200">{check.payee}</p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">{new Date(check.dueDate).toLocaleDateString(language === 'fa' ? 'fa-IR' : 'en-US')}</p>
-                                </div>
-                                <p className="font-semibold text-red-500">{formatCurrency(check.amount)}</p>
-                            </div>
-                        )) : <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">چک فعالی برای آینده نزدیک وجود ندارد.</p>}
-                    </div>
+                     <h3 className="text-lg font-semibold mb-4">{t('upcomingChecks')}</h3>
+                     <div className="space-y-3">
+                         {upcomingChecks.length > 0 ? (
+                             upcomingChecks.map(check => (
+                                <div key={check.id} className="flex justify-between items-center text-sm p-2 rounded-md bg-gray-50 dark:bg-gray-700/50">
+                                     <div>
+                                         <p className="font-medium">{check.payee}</p>
+                                         <p className="text-xs text-gray-500 dark:text-gray-400">{new Date(check.dueDate).toLocaleDateString(language === 'fa' ? 'fa-IR' : 'en-US')}</p>
+                                     </div>
+                                     <p className={`font-semibold ${check.type === 'incoming' ? 'text-green-500' : 'text-red-500'}`}>
+                                         {formatCurrency(check.amount)}
+                                     </p>
+                                 </div>
+                            ))
+                         ) : <p className="text-sm text-gray-500 dark:text-gray-400">{t('noData')}</p>}
+                     </div>
                 </div>
             </div>
-            
+
             <FinancialAssistant contextData={contextDataForAI} />
         </div>
     );

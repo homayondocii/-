@@ -1,12 +1,6 @@
-
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useLocalization } from '../../context/LocalizationContext';
-import { askFinancialAssistant } from '../../services/geminiService';
-
-interface Message {
-    sender: 'user' | 'ai';
-    text: string;
-}
+import { getFinancialAdvice, isGeminiConfigured } from '../../services/geminiService';
 
 interface FinancialAssistantProps {
     contextData: string;
@@ -14,32 +8,22 @@ interface FinancialAssistantProps {
 
 export const FinancialAssistant: React.FC<FinancialAssistantProps> = ({ contextData }) => {
     const { t } = useLocalization();
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [input, setInput] = useState('');
+    const [question, setQuestion] = useState('');
+    const [answer, setAnswer] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [error, setError] = useState<string | null>(null);
+    const configured = isGeminiConfigured();
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
-
-    useEffect(scrollToBottom, [messages]);
-
-    const handleSend = async () => {
-        if (input.trim() === '' || isLoading) return;
-
-        const userMessage: Message = { sender: 'user', text: input };
-        setMessages(prev => [...prev, userMessage]);
-        setInput('');
+    const handleAsk = async () => {
+        if (!question.trim()) return;
         setIsLoading(true);
-
+        setError(null);
+        setAnswer('');
         try {
-            const aiResponseText = await askFinancialAssistant(input, contextData);
-            const aiMessage: Message = { sender: 'ai', text: aiResponseText };
-            setMessages(prev => [...prev, aiMessage]);
-        } catch (error) {
-            const errorMessage: Message = { sender: 'ai', text: 'An error occurred. Please try again.' };
-            setMessages(prev => [...prev, errorMessage]);
+            const result = await getFinancialAdvice(contextData, question);
+            setAnswer(result);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'An unknown error occurred.');
         } finally {
             setIsLoading(false);
         }
@@ -47,48 +31,47 @@ export const FinancialAssistant: React.FC<FinancialAssistantProps> = ({ contextD
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center">
-                <svg className="w-6 h-6 text-blue-500 me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                {t('financialAssistant')}
-            </h3>
-            <div className="h-64 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-700 rounded-lg mb-4 border border-gray-200 dark:border-gray-600">
-                {messages.map((msg, index) => (
-                    <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} mb-3`}>
-                        <div className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-2 rounded-xl ${msg.sender === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200'}`}>
-                           <p className="whitespace-pre-wrap">{msg.text}</p>
+            <h3 className="text-lg font-semibold mb-4">{t('financialAssistant')}</h3>
+            <div className="space-y-4">
+                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg min-h-[6rem]">
+                    <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
+                        {answer || t('assistantWelcome')}
+                    </p>
+                    {isLoading && (
+                        <div className="flex items-center justify-center pt-4">
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Analyzing...</span>
                         </div>
+                    )}
+                     {error && <p className="text-red-500 text-sm pt-2">{error}</p>}
+                </div>
+                {configured ? (
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={question}
+                            onChange={(e) => setQuestion(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && !isLoading && handleAsk()}
+                            placeholder={t('askFinancialQuestion')}
+                            className="flex-grow p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                            disabled={isLoading}
+                        />
+                        <button
+                            onClick={handleAsk}
+                            disabled={isLoading || !question.trim()}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-300 dark:disabled:bg-blue-800 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {isLoading ? t('search') : t('ask')}
+                        </button>
                     </div>
-                ))}
-                {isLoading && (
-                     <div className="flex justify-start mb-3">
-                        <div className="max-w-xs px-4 py-2 rounded-xl bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200">
-                           <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse"></div>
-                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse delay-75"></div>
-                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse delay-150"></div>
-                           </div>
-                        </div>
+                ) : (
+                     <div className="p-4 text-sm text-yellow-800 bg-yellow-50 rounded-lg dark:bg-gray-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700" role="alert">
+                      <span className="font-medium">{t('assistantConfigNeeded')}</span>
                     </div>
                 )}
-                <div ref={messagesEndRef} />
-            </div>
-            <div className="flex">
-                <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                    placeholder={t('askMe')}
-                    className="flex-1 p-2 border border-gray-300 rounded-s-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
-                    disabled={isLoading}
-                />
-                <button
-                    onClick={handleSend}
-                    disabled={isLoading}
-                    className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-e-md hover:bg-blue-700 disabled:bg-blue-300 dark:disabled:bg-blue-800"
-                >
-                    {t('send')}
-                </button>
             </div>
         </div>
     );

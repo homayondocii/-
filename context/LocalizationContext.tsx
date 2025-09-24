@@ -12,7 +12,9 @@ const LocalizationContext = createContext<LocalizationContextType | undefined>(u
 
 export const LocalizationProvider: React.FC<{ language: Language; children: ReactNode }> = ({ language, children }) => {
     const t = (key: keyof typeof LOCALIZATION_STRINGS.fa): string => {
-        return LOCALIZATION_STRINGS[language][key] || key;
+        // FIX: The key can be inferred as `string | number` due to the index signature
+        // on LocalizationStrings. Casting the return value to string ensures type safety.
+        return String(LOCALIZATION_STRINGS[language][key] || key);
     };
 
     return (

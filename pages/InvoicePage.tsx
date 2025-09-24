@@ -65,17 +65,17 @@ export const InvoicePage: React.FC = () => {
                 {items.map((item, index) => (
                     <div key={index} className="border p-3 rounded-lg space-y-2">
                         <div className="flex justify-between items-center">
-                           <h4 className="font-semibold">آیتم #{index + 1}</h4>
-                           <button onClick={() => removeItem(index)} className="text-red-500 hover:text-red-700">x</button>
+                           <h4 className="font-semibold">{t('invoiceItem')} #{index + 1}</h4>
+                           <button onClick={() => removeItem(index)} className="text-red-500 hover:text-red-700">{t('removeItem')}</button>
                         </div>
                         <input type="text" placeholder={t('item')} value={item.description} onChange={(e) => handleItemChange(index, 'description', e.target.value)} className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600" />
                         <div className="flex gap-2">
-                            <input type="number" placeholder={t('quantity')} value={item.quantity} onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value))} className="w-1/2 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600" />
-                            <input type="number" placeholder={t('unitPrice')} value={item.price} onChange={(e) => handleItemChange(index, 'price', parseFloat(e.target.value))} className="w-1/2 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600" />
+                            <input type="number" placeholder={t('quantity')} value={item.quantity} onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)} className="w-1/2 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600" />
+                            <input type="number" placeholder={t('unitPrice')} value={item.price} onChange={(e) => handleItemChange(index, 'price', parseFloat(e.target.value) || 0)} className="w-1/2 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600" />
                         </div>
                     </div>
                 ))}
-                <button onClick={addItem} className="w-full py-2 text-sm bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500">افزودن آیتم</button>
+                <button onClick={addItem} className="w-full py-2 text-sm bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500">{t('addItem')}</button>
                 <button onClick={handlePrint} className="w-full py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700">{t('printInvoice')}</button>
             </div>
             
@@ -83,7 +83,7 @@ export const InvoicePage: React.FC = () => {
                 <div ref={invoiceRef} className="p-4 text-black">
                      <div className="flex justify-between items-start mb-8">
                         <div>
-                            <h1 className="text-2xl font-bold">فاکتور فروش</h1>
+                            <h1 className="text-2xl font-bold">{t('invoiceHeader')}</h1>
                             <p>{t('invoiceNumber')}: INV-{new Date().getFullYear()}-001</p>
                             <p>{t('invoiceDate')}: {new Date().toLocaleDateString('fa-IR')}</p>
                         </div>

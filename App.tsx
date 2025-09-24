@@ -1,5 +1,4 @@
-
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { DashboardPage } from './pages/DashboardPage';
@@ -7,39 +6,130 @@ import { TransactionsPage } from './pages/TransactionsPage';
 import { ChecksPage } from './pages/ChecksPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { InvoicePage } from './pages/InvoicePage';
+import { SettingsPage } from './pages/SettingsPage';
+import { LoginPage } from './pages/LoginPage';
 import { LocalizationProvider } from './context/LocalizationContext';
-import { Page, Language } from './types';
-import { mockTransactions, mockChecks, mockProducts } from './data/mockData';
-import type { Transaction, Check, Product } from './types';
+import { supabase, onAuthStateChange, isSupabaseConfigured } from './services/supabaseClient';
+import { Page, Language, Transaction, Check, Product } from './types';
+import type { Session } from '@supabase/supabase-js';
 
-const App: React.FC = () => {
+
+function App() {
+    const [isConfigured, setIsConfigured] = useState(false);
+    const [session, setSession] = useState<Session | null>(null);
+    const [loading, setLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState<Page>(Page.DASHBOARD);
-    const [language, setLanguage] = useState<Language>(Language.FA);
+    const [language, setLanguage] = useState<Language>('fa');
+    
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [checks, setChecks] = useState<Check[]>([]);
+    const [products, setProducts] = useState<Product[]>([]);
+    
+    useEffect(() => {
+        setIsConfigured(isSupabaseConfigured());
+    }, []);
 
-    const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
-    const [checks, setChecks] = useState<Check[]>(mockChecks);
-    const [products, setProducts] = useState<Product[]>(mockProducts);
+    useEffect(() => {
+        if (!isConfigured) {
+            setLoading(false);
+            return;
+        }
 
-    const toggleLanguage = useCallback(() => {
-        const newLang = language === Language.EN ? Language.FA : Language.EN;
-        setLanguage(newLang);
-        document.documentElement.lang = newLang;
-        document.documentElement.dir = newLang === Language.FA ? 'rtl' : 'ltr';
+        const { data: authListener } = onAuthStateChange((_event, session) => {
+            setSession(session);
+            setLoading(false);
+        });
+
+        return () => {
+            authListener.subscription.unsubscribe();
+        };
+    }, [isConfigured]);
+    
+    useEffect(() => {
+        if (session && isConfigured) {
+            fetchData(session.user.id);
+        }
+    }, [session, isConfigured]);
+
+    useEffect(() => {
+        document.documentElement.lang = language;
+        document.documentElement.dir = language === 'fa' ? 'rtl' : 'ltr';
     }, [language]);
 
-    const addTransaction = (transaction: Omit<Transaction, 'id'>) => {
-        setTransactions(prev => [{ ...transaction, id: prev.length + 1 }, ...prev]);
+    const fetchData = async (userId: string) => {
+        if (!supabase) return;
+        const [transactionsRes, checksRes, productsRes] = await Promise.all([
+            supabase.from('transactions').select('*').eq('user_id', userId),
+            supabase.from('checks').select('*').eq('user_id', userId),
+            supabase.from('products').select('*').eq('user_id', userId)
+        ]);
+        if (transactionsRes.data) setTransactions(transactionsRes.data as Transaction[]);
+        if (checksRes.data) setChecks(checksRes.data as Check[]);
+        if (productsRes.data) setProducts(productsRes.data as Product[]);
     };
 
-    const addCheck = (check: Omit<Check, 'id'>) => {
-        setChecks(prev => [{ ...check, id: prev.length + 1 }, ...prev]);
+    const toggleLanguage = () => {
+        setLanguage(prev => prev === 'fa' ? 'en' : 'fa');
+    };
+
+    const addTransaction = async (transaction: Omit<Transaction, 'id' | 'user_id'>) => {
+        if (!supabase || !session) return;
+        const { data, error } = await supabase
+            .from('transactions')
+            .insert({ ...transaction, user_id: session.user.id })
+            .select()
+            .single();
+
+        if (data && !error) {
+            setTransactions(prev => [...prev, data as Transaction]);
+        } else {
+            console.error("Error adding transaction:", error);
+        }
     };
     
-    const updateProductStock = (productId: number, amount: number) => {
-        setProducts(prev => prev.map(p => p.id === productId ? {...p, stock: p.stock + amount} : p));
+    const addCheck = async (check: Omit<Check, 'id' | 'user_id'>) => {
+        if (!supabase || !session) return;
+        const { data, error } = await supabase
+            .from('checks')
+            .insert({ ...check, user_id: session.user.id })
+            .select()
+            .single();
+
+        if (data && !error) {
+            setChecks(prev => [...prev, data as Check]);
+        } else {
+            console.error("Error adding check:", error);
+        }
     };
 
-    const pageContent = useMemo(() => {
+    const updateProductStock = async (productId: number, amount: number) => {
+        if (!supabase || !session) return;
+        const product = products.find(p => p.id === productId);
+        if (!product) return;
+        
+        const newStock = Math.max(0, product.stock + amount);
+
+        const { data, error } = await supabase
+            .from('products')
+            .update({ stock: newStock })
+            .eq('id', productId)
+            .eq('user_id', session.user.id)
+            .select()
+            .single();
+
+        if (data && !error) {
+            setProducts(prev => prev.map(p => p.id === productId ? (data as Product) : p));
+        } else {
+            console.error("Error updating product stock:", error);
+        }
+    };
+
+    const renderPage = () => {
+        // If not configured, always show settings
+        if (!isConfigured) {
+             return <SettingsPage />;
+        }
+
         switch (currentPage) {
             case Page.DASHBOARD:
                 return <DashboardPage transactions={transactions} checks={checks} />;
@@ -49,26 +139,43 @@ const App: React.FC = () => {
                 return <ChecksPage checks={checks} addCheck={addCheck} />;
             case Page.INVENTORY:
                 return <InventoryPage products={products} updateProductStock={updateProductStock} />;
-            case Page.INVOICES:
-                 return <InvoicePage />;
+            case Page.INVOICE:
+                return <InvoicePage />;
+            case Page.SETTINGS:
+                return <SettingsPage />;
             default:
                 return <DashboardPage transactions={transactions} checks={checks} />;
         }
-    }, [currentPage, transactions, checks, products]);
+    };
+    
+    if (loading) {
+        return <div className="flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-900 text-white">Loading...</div>;
+    }
+    
+    // If configured, but no session, show login page.
+    if (isConfigured && !session) {
+        return (
+            <LocalizationProvider language={language}>
+                <LoginPage />
+            </LocalizationProvider>
+        );
+    }
+    
+    const pageToRender = isConfigured ? currentPage : Page.SETTINGS;
 
     return (
         <LocalizationProvider language={language}>
-            <div className={`flex h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 ${language === Language.FA ? 'font-vazir' : 'font-sans'}`}>
-                <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
-                <div className="flex-1 flex flex-col overflow-hidden">
-                    <Header currentPage={currentPage} toggleLanguage={toggleLanguage} />
-                    <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 p-4 sm:p-6">
-                        {pageContent}
+            <div className={`flex h-screen bg-gray-100 dark:bg-gray-900 font-sans`}>
+                <Sidebar currentPage={pageToRender} setCurrentPage={setCurrentPage} session={session} />
+                <div className="flex flex-col flex-1 overflow-y-auto">
+                    <Header currentPage={pageToRender} toggleLanguage={toggleLanguage} />
+                    <main className="p-6">
+                        {renderPage()}
                     </main>
                 </div>
             </div>
         </LocalizationProvider>
     );
-};
+}
 
 export default App;
