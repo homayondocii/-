@@ -1,5 +1,3 @@
-export type Language = 'en' | 'fa';
-
 export enum Page {
     DASHBOARD = 'dashboard',
     TRANSACTIONS = 'transactions',
@@ -9,48 +7,48 @@ export enum Page {
     SETTINGS = 'settings',
 }
 
-export enum TransactionType {
-    INCOME = 'income',
-    EXPENSE = 'expense',
-}
+export type Language = 'en' | 'fa';
 
 export interface Transaction {
-    id: number;
-    type: TransactionType;
-    category: string;
+    id: string;
+    date: string; // ISO string
     description: string;
     amount: number;
-    date: string; // ISO string format
-    user_id?: string;
-}
-
-export enum CheckType {
-    INCOMING = 'incoming',
-    OUTGOING = 'outgoing',
-}
-
-export enum CheckStatus {
-    PENDING = 'pending',
-    CASHED = 'cashed',
-    BOUNCED = 'bounced',
+    type: 'income' | 'expense';
+    category: string;
 }
 
 export interface Check {
-    id: number;
-    type: CheckType;
+    id: string;
+    checkNumber: string;
     payee: string;
     amount: number;
-    dueDate: string; // ISO string format
-    status: CheckStatus;
-    description: string;
-    user_id?: string;
+    date: string; // ISO string
+    status: 'cashed' | 'pending' | 'bounced';
 }
 
-export interface Product {
-    id: number;
+export interface InventoryItem {
+    id: string;
     name: string;
-    barcode: string;
-    stock: number;
-    price: number;
-    user_id?: string;
+    quantity: number;
+    unitPrice: number;
+    supplier: string;
+}
+
+export interface Invoice {
+    id: string;
+    invoiceNumber: string;
+    customerName: string;
+    amount: number;
+    dueDate: string; // ISO string
+    status: 'paid' | 'unpaid' | 'overdue';
+}
+
+export interface DataSummary {
+    totalIncome: number;
+    totalExpense: number;
+    netProfit: number;
+    pendingChecks: number;
+    inventoryValue: number;
+    unpaidInvoices: number;
 }

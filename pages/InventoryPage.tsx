@@ -1,63 +1,44 @@
-
-import React, { useState, useMemo } from 'react';
+import React from 'react';
 import { useLocalization } from '../context/LocalizationContext';
-import { Product } from '../types';
+import { mockInventory } from '../data/mockData';
+import { InventoryItem } from '../types';
 
-interface InventoryPageProps {
-    products: Product[];
-    updateProductStock: (productId: number, amount: number) => void;
-}
-
-export const InventoryPage: React.FC<InventoryPageProps> = ({ products, updateProductStock }) => {
+export const InventoryPage: React.FC = () => {
     const { t, language } = useLocalization();
-    const [searchTerm, setSearchTerm] = useState('');
 
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat(language === 'fa' ? 'fa-IR' : 'en-US').format(value);
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat(language === 'fa' ? 'fa-IR' : 'en-US', {
+            style: 'currency',
+            currency: 'USD'
+        }).format(amount);
     };
 
-    const filteredProducts = useMemo(() => {
-        return products.filter(p =>
-            p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.barcode.includes(searchTerm)
-        );
-    }, [products, searchTerm]);
+    const formatNumber = (num: number) => {
+        return num.toLocaleString(language === 'fa' ? 'fa-IR' : 'en-US');
+    }
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('inventoryTitle')}</h2>
-                <input
-                    type="text"
-                    placeholder={t('searchInventoryPlaceholder')}
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600"
-                />
-            </div>
-
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">{t('inventory')}</h2>
             <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
                     <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                         <tr>
-                            <th scope="col" className="px-6 py-3">{t('productName')}</th>
-                            <th scope="col" className="px-6 py-3">{t('barcode')}</th>
-                            <th scope="col" className="px-6 py-3">{t('stock')}</th>
-                            <th scope="col" className="px-6 py-3">{t('price')}</th>
-                            <th scope="col" className="px-6 py-3 text-center">{t('actions')}</th>
+                            <th scope="col" className="px-6 py-3">{t('itemName')}</th>
+                            <th scope="col" className="px-6 py-3">{t('supplier')}</th>
+                            <th scope="col" className="px-6 py-3 text-right">{t('quantity')}</th>
+                            <th scope="col" className="px-6 py-3 text-right">{t('unitPrice')}</th>
+                            <th scope="col" className="px-6 py-3 text-right">{t('totalValue')}</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredProducts.map(product => (
-                            <tr key={product.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{product.name}</td>
-                                <td className="px-6 py-4 font-mono">{product.barcode}</td>
-                                <td className="px-6 py-4">{product.stock}</td>
-                                <td className="px-6 py-4">{formatCurrency(product.price)}</td>
-                                <td className="px-6 py-4 text-center">
-                                    <button onClick={() => updateProductStock(product.id, 1)} className="font-medium text-green-600 dark:text-green-500 hover:underline mx-1">{t('stockIn')}</button>
-                                    <button onClick={() => updateProductStock(product.id, -1)} className="font-medium text-red-600 dark:text-red-500 hover:underline mx-1">{t('stockOut')}</button>
-                                </td>
+                        {mockInventory.map((item: InventoryItem) => (
+                            <tr key={item.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{item.name}</td>
+                                <td className="px-6 py-4">{item.supplier}</td>
+                                <td className="px-6 py-4 text-right">{formatNumber(item.quantity)}</td>
+                                <td className="px-6 py-4 text-right">{formatCurrency(item.unitPrice)}</td>
+                                <td className="px-6 py-4 text-right font-semibold text-gray-800 dark:text-white">{formatCurrency(item.quantity * item.unitPrice)}</td>
                             </tr>
                         ))}
                     </tbody>
